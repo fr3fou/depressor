@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"encoding/binary"
+	"errors"
+	"fmt"
+	"io"
 	"math/bits"
 	"os"
 )
 
 func main() {
-	text := "aabcd"
+	text := "maikati"
 	if len(os.Args) > 1 && os.Args[1] == "decompress" {
 		decompress(text)
 	} else {
@@ -31,6 +35,10 @@ func compress(text string) {
 		code := dictionary[r]
 		buf, carry = encodePrefix(buf, carry, code)
 	}
+	for _, b := range buf {
+		fmt.Printf("%08b ", b)
+	}
+	fmt.Println()
 
 	if err := binary.Write(file, binary.BigEndian, buf); err != nil {
 		panic(err)
@@ -45,6 +53,37 @@ func decompress(text string) {
 
 	// todo get tree _from_ file
 	huffman := BuildHuffmanTree(text)
+	fmt.Println(Render(huffman))
+	br := bufio.NewReader(file)
+	for {
+		b, err := br.ReadByte()
+		if err != nil && !errors.Is(err, io.EOF) {
+			fmt.Println(err)
+			break
+		}
+
+		p := 8
+		node := huffman
+		for p >= 0 {
+			if b&(1<<p) == 0 {
+				node = *node.Data.Left
+			} else {
+				node = *node.Data.Right
+			}
+
+			if node.Data.Rune != 0 {
+				fmt.Print(string(node.Data.Rune))
+				node = huffman
+			}
+			p--
+		}
+
+		if err != nil {
+			// end of file
+			break
+		}
+	}
+	fmt.Println()
 }
 
 type HuffmanNode struct {
@@ -94,10 +133,12 @@ func BuildHuffmanDictionary(huffman *Node[HuffmanNode, int], dictionary map[rune
 	}
 
 	if huffman.Data.Left != nil {
+		// Set 0 for left
 		BuildHuffmanDictionary(huffman.Data.Left, dictionary, depth+1, state)
 	}
 
 	if huffman.Data.Right != nil {
+		// Set 1 for right
 		BuildHuffmanDictionary(huffman.Data.Right, dictionary, depth+1, state|(1<<depth))
 	}
 }
