@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/bits"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -31,10 +32,18 @@ func compress(text string) {
 
 	var buf []byte
 	var carry int8
+
+	// Header
+	if err := binary.Write(file, binary.BigEndian, uint64(len(text))); err != nil {
+		panic(err)
+	}
+
+	// Body
 	for _, r := range text {
 		code := dictionary[r]
 		buf, carry = encodePrefix(buf, carry, code)
 	}
+
 	for _, b := range buf {
 		fmt.Printf("%08b ", b)
 	}
@@ -53,9 +62,21 @@ func decompress(text string) {
 
 	// todo get tree _from_ file
 	huffman := BuildHuffmanTree(text)
-	fmt.Println(Render(huffman))
+
 	br := bufio.NewReader(file)
-	for {
+
+	// Header
+	buf := make([]byte, 8)
+	_, err = br.Read(buf)
+	if err != nil {
+		panic(err)
+	}
+	textLength := binary.BigEndian.Uint64(buf)
+	fmt.Println(textLength)
+
+	// Body
+	sb := &strings.Builder{}
+	for sb.Len() <= int(textLength) {
 		b, err := br.ReadByte()
 		if err != nil && !errors.Is(err, io.EOF) {
 			fmt.Println(err)
@@ -72,7 +93,7 @@ func decompress(text string) {
 			}
 
 			if node.Data.Rune != 0 {
-				fmt.Print(string(node.Data.Rune))
+				sb.WriteRune(node.Data.Rune)
 				node = huffman
 			}
 			p--
@@ -83,7 +104,7 @@ func decompress(text string) {
 			break
 		}
 	}
-	fmt.Println()
+	fmt.Println(sb.String())
 }
 
 type HuffmanNode struct {
