@@ -30,18 +30,16 @@ func compress(text string) {
 	}
 	defer file.Close()
 
-	var buf []byte
-	var carry int8
+	buf := make([]byte, 8)
 
 	// Header
-	if err := binary.Write(file, binary.BigEndian, uint64(len(text))); err != nil {
-		panic(err)
-	}
+	binary.BigEndian.PutUint64(buf, uint64(len(text)))
 
 	// Body
+	var overflow int8
 	for _, r := range text {
 		code := dictionary[r]
-		buf, carry = encodePrefix(buf, carry, code)
+		buf, overflow = encodePrefix(buf, overflow, code)
 	}
 
 	for _, b := range buf {
@@ -71,12 +69,12 @@ func decompress(text string) {
 	if err != nil {
 		panic(err)
 	}
+
 	textLength := binary.BigEndian.Uint64(buf)
-	fmt.Println(textLength)
 
 	// Body
 	sb := &strings.Builder{}
-	for sb.Len() <= int(textLength) {
+	for sb.Len() < int(textLength) {
 		b, err := br.ReadByte()
 		if err != nil && !errors.Is(err, io.EOF) {
 			fmt.Println(err)
@@ -85,7 +83,7 @@ func decompress(text string) {
 
 		p := 8
 		node := huffman
-		for p >= 0 {
+		for p >= 0 && sb.Len() < int(textLength) {
 			if b&(1<<p) == 0 {
 				node = *node.Data.Left
 			} else {
@@ -165,7 +163,7 @@ func BuildHuffmanDictionary(huffman *Node[HuffmanNode, int], dictionary map[rune
 }
 
 // shoutout tsetso
-func encodePrefix(buf []byte, carry int8, code uint32) ([]byte, int8) {
+func encodePrefix(buf []byte, overflow int8, code uint32) ([]byte, int8) {
 	acc := buf
 	l := bits.Len32(code)
 
@@ -173,7 +171,7 @@ func encodePrefix(buf []byte, carry int8, code uint32) ([]byte, int8) {
 	// `read` is the current bit we're reading from `code` -> [0..l-2]
 	// `write` is the current bit we're writing into `acc` -> [7..0]
 	read := 0
-	write := carry - 1
+	write := overflow - 1
 
 	// Helper for appending a new byte and resetting the write pointer
 	newByte := func() {
@@ -183,7 +181,7 @@ func encodePrefix(buf []byte, carry int8, code uint32) ([]byte, int8) {
 
 	// If there's no space left over from a previous serialization, start by
 	// appending a new byte.
-	if carry == 0 {
+	if overflow == 0 {
 		newByte()
 	}
 
