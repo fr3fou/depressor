@@ -7,8 +7,10 @@ import (
 	"github.com/emicklei/dot"
 )
 
-func Render(huffman Node[HuffmanNode, int]) string {
+func Render(huffman *PriorityQueueNode[HuffmanNode, int]) string {
 	graph := dot.NewGraph(dot.Directed)
+	// This preserves the order in which they were added
+	// Otherwise, left & right _could_ be swapped
 	graph.Attr("compound", "true")
 	graph.Attr("ordering", "out")
 	root := graph.Node("Root")
@@ -17,7 +19,7 @@ func Render(huffman Node[HuffmanNode, int]) string {
 	return graph.String()
 }
 
-func render(huffman Node[HuffmanNode, int], graph *dot.Graph, node dot.Node) {
+func render(huffman *PriorityQueueNode[HuffmanNode, int], graph *dot.Graph, node dot.Node) {
 	if huffman.Data.Left != nil {
 		r := huffman.Data.Left.Data.Rune
 		leftNode := graph.Node(randomID(5))
@@ -26,7 +28,7 @@ func render(huffman Node[HuffmanNode, int], graph *dot.Graph, node dot.Node) {
 			label = fmt.Sprintf(`'%s', (%s)`, string(r), label)
 		}
 		leftNode.Label(label)
-		render(*huffman.Data.Left, graph, leftNode)
+		render(huffman.Data.Left, graph, leftNode)
 		node.Edge(leftNode)
 	}
 
@@ -38,7 +40,7 @@ func render(huffman Node[HuffmanNode, int], graph *dot.Graph, node dot.Node) {
 			label = fmt.Sprintf(`'%s' (%s)`, string(r), label)
 		}
 		rightNode.Label(label)
-		render(*huffman.Data.Right, graph, rightNode)
+		render(huffman.Data.Right, graph, rightNode)
 		node.Edge(rightNode)
 	}
 }
