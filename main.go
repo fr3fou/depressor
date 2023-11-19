@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -13,11 +12,14 @@ import (
 )
 
 func main() {
-	text := "asdfasdfъ🔥"
+	text, err := os.ReadFile("lorem.txt")
+	if err != nil {
+		panic(err)
+	}
 	if len(os.Args) > 1 && os.Args[1] == "decompress" {
-		decompress(text)
+		decompress()
 	} else {
-		compress(text)
+		compress(string(text))
 	}
 }
 
@@ -25,16 +27,14 @@ func compress(text string) {
 	huffman := BuildHuffmanTree(text)
 	dictionary := BuildHuffmanDictionary(&huffman)
 
+	fmt.Println(Render(&huffman))
 	file, err := os.Create("text.maikati")
 	if err != nil {
 		panic(err)
 	}
 	defer file.Close()
 
-	fmt.Println(Render(&huffman))
-
-	writer := bytes.NewBuffer([]byte{})
-	buf := make([]byte, 8)
+	writer := bufio.NewWriter(file)
 
 	// Header
 	if err := EncodeHuffmanTree(writer, &huffman); err != nil {
@@ -45,7 +45,8 @@ func compress(text string) {
 		panic(err)
 	}
 
-	binary.BigEndian.PutUint64(buf, uint64(len(text)))
+	buf := []byte{}
+	buf = binary.AppendUvarint(buf, uint64(len(text)))
 	_, err = writer.Write(buf)
 	if err != nil {
 		panic(err)
@@ -58,43 +59,109 @@ func compress(text string) {
 		code := dictionary[r]
 		buf, overflow = encodeVarint(buf, overflow, code)
 	}
+
 	_, err = writer.Write(buf)
 	if err != nil {
 		panic(err)
 	}
 
-	for _, b := range writer.Bytes() {
-		fmt.Printf("%08b ", b)
-	}
-	fmt.Println()
-
-	if err := binary.Write(file, binary.BigEndian, writer.Bytes()); err != nil {
+	if err := writer.Flush(); err != nil {
 		panic(err)
 	}
 }
 
-func decompress(text string) {
+func decompress() {
 	file, err := os.Open("text.maikati")
 	if err != nil {
 		panic(err)
 	}
 
-	// todo get tree _from_ file
-	huffman := BuildHuffmanTree(text)
-
 	br := bufio.NewReader(file)
 
+	s := []*PriorityQueueNode[HuffmanNode, int]{}
+
 	// Header
-	buf := make([]byte, 8)
-	_, err = br.Read(buf)
+	for {
+		b, err := br.ReadByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			panic(err)
+		}
+
+		fmt.Printf("%08b ", b)
+
+		if b == 0 {
+			break
+		}
+
+		if b == 1 {
+			s = append(s, &PriorityQueueNode[HuffmanNode, int]{})
+			continue
+		}
+
+		if err := br.UnreadByte(); err != nil {
+			panic(err)
+		}
+
+		// Leaf Node
+		r, _, err := br.ReadRune()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			panic(err)
+		}
+
+		s = append(s, &PriorityQueueNode[HuffmanNode, int]{
+			Data: HuffmanNode{
+				Rune: r,
+			},
+		})
+	}
+	fmt.Println()
+
+	stack := Stack[*PriorityQueueNode[HuffmanNode, int]]{
+		Data: []*PriorityQueueNode[HuffmanNode, int]{
+			s[len(s)-1],
+		},
+	}
+
+	for i := len(s) - 2; i >= 0; i-- {
+		n := &PriorityQueueNode[HuffmanNode, int]{
+			Data: HuffmanNode{
+				Left:  left,
+				Right: right,
+			},
+		}
+		fmt.Println("size", stack.Len())
+		if stack.Len() > 2 {
+			right := stack.Pop()
+			left := stack.Pop()
+			stack.Push()
+		} else {
+			stack.Push(&PriorityQueueNode[HuffmanNode, int]{
+				Data: HuffmanNode{
+					Rune: s[i].Data.Rune,
+				},
+			})
+		}
+	}
+	fmt.Printf("%+v\n", stack)
+
+	textLength, err := binary.ReadUvarint(br)
 	if err != nil {
 		panic(err)
 	}
 
-	textLength := binary.BigEndian.Uint64(buf)
-
 	// Body
+	root := stack.Pop()
+	fmt.Println(Render(root))
+
+	// todo: flush / buffer to handle larger files
 	sb := &strings.Builder{}
+	node := root
 	for sb.Len() < int(textLength) {
 		b, err := br.ReadByte()
 		if err != nil && !errors.Is(err, io.EOF) {
@@ -102,18 +169,17 @@ func decompress(text string) {
 			break
 		}
 
-		p := 8
-		node := huffman
+		p := 7
 		for p >= 0 && sb.Len() < int(textLength) {
-			if b&(1<<p) == 0 {
-				node = *node.Data.Left
+			if (b & (1 << p)) == 0 {
+				node = node.Data.Left
 			} else {
-				node = *node.Data.Right
+				node = node.Data.Right
 			}
 
 			if node.Data.Rune != 0 {
 				sb.WriteRune(node.Data.Rune)
-				node = huffman
+				node = root
 			}
 			p--
 		}

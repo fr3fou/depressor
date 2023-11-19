@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/binary"
 	"io"
 	"unicode/utf8"
@@ -46,31 +47,39 @@ func BuildHuffmanTree(text string) PriorityQueueNode[HuffmanNode, int] {
 	return PriorityQueueNode[HuffmanNode, int]{}
 }
 
-func EncodeHuffmanTree(w io.Writer, huffman *PriorityQueueNode[HuffmanNode, int]) error {
-	if huffman.Data.Left != nil {
-		if err := EncodeHuffmanTree(w, huffman.Data.Left); err != nil {
-			return err
-		}
-	}
-
-	if huffman.Data.Rune != 0 {
-		p := make([]byte, utf8.RuneLen(huffman.Data.Rune))
-		utf8.EncodeRune(p, huffman.Data.Rune)
-		if err := binary.Write(w, binary.BigEndian, p); err != nil {
-			return err
-		}
-	} else {
+func writeNode(w io.Writer, huffman *PriorityQueueNode[HuffmanNode, int]) error {
+	if huffman.Data.Rune == 0 {
 		if err := binary.Write(w, binary.BigEndian, byte(1)); err != nil {
 			return err
 		}
+		return nil
 	}
 
-	if huffman.Data.Right != nil {
-		if err := EncodeHuffmanTree(w, huffman.Data.Right); err != nil {
-			return err
-		}
+	p := make([]byte, utf8.RuneLen(huffman.Data.Rune))
+	utf8.EncodeRune(p, huffman.Data.Rune)
+	if err := binary.Write(w, binary.BigEndian, p); err != nil {
+		return err
+	}
+	return nil
+}
+
+func EncodeHuffmanTree(w io.Writer, huffman *PriorityQueueNode[HuffmanNode, int]) error {
+	if huffman == nil {
+		return nil
 	}
 
+	if err := EncodeHuffmanTree(w, huffman.Data.Left); err != nil {
+		return err
+	}
+
+	if err := EncodeHuffmanTree(w, huffman.Data.Right); err != nil {
+		return err
+	}
+
+	return writeNode(w, huffman)
+}
+
+func DecodeHuffmanTree(r bufio.Reader) *PriorityQueueNode[HuffmanNode, int] {
 	return nil
 }
 
