@@ -21,10 +21,10 @@ func main() {
 }
 
 func usage() {
-	log.Println("usage: ")
-	log.Println("	depressor -c file.txt")
-	log.Println("	depressor -d file.txt.mkti")
-	log.Println("	depressor -help")
+	fmt.Println("usage: ")
+	fmt.Println("	depressor -c file.txt")
+	fmt.Println("	depressor -d file.txt.mkti")
+	fmt.Println("	depressor -help")
 }
 
 func run() error {
@@ -88,7 +88,7 @@ func compress(fileName string, reader io.Reader) error {
 	buf = []byte{}
 	for _, r := range text {
 		code := dictionary[r]
-		buf, overflow = encodeVarint(buf, overflow, code)
+		buf, overflow = encode(buf, overflow, code)
 	}
 
 	_, err = writer.Write(buf)
@@ -153,7 +153,7 @@ func decompress(fileName string, reader io.Reader) error {
 }
 
 // shoutout tsetso
-func encodeVarint(buf []byte, overflow int8, code uint32) ([]byte, int8) {
+func encode(buf []byte, overflow int8, code uint32) ([]byte, int8) {
 	acc := buf
 	l := bits.Len32(code)
 
