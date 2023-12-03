@@ -54,7 +54,6 @@ type Scanner interface {
 func Decode(scanner Scanner) (*pq.Node[Node, int], error) {
 	s := []*pq.Node[Node, int]{}
 
-	// Header
 	for {
 		b, err := scanner.ReadByte()
 		if err != nil {
@@ -95,18 +94,16 @@ func Decode(scanner Scanner) (*pq.Node[Node, int], error) {
 		})
 	}
 
-	stack := &stack.Stack[*pq.Node[HuffmanNode, int]]{
-		Data: []*pq.Node[Node, int]{},
-	}
+	stack := stack.NewStack[*pq.Node[Node, int]]()
 
 	for i := len(s) - 1; i >= 0; i-- {
 		stack.Push(s[i])
 	}
 
-	return rebuildTree(stack), nil
+	return rebuildTree(&stack), nil
 }
 
-func rebuildTree(stack *stack.Stack[*pq.Node[HuffmanNode, int]]) *pq.Node[Node, int] {
+func rebuildTree(stack *stack.Stack[*pq.Node[Node, int]]) *pq.Node[Node, int] {
 	if stack.Len() < 1 {
 		return nil
 	}
