@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"encoding/binary"
+	"errors"
 	"io"
 	"unicode/utf8"
 )
@@ -13,7 +13,7 @@ type HuffmanNode struct {
 	Rune  rune
 }
 
-func BuildHuffmanTree(text string) PriorityQueueNode[HuffmanNode, int] {
+func BuildHuffmanTreeFromText(text string) PriorityQueueNode[HuffmanNode, int] {
 	queue := NewPriorityQueue[HuffmanNode, int]()
 	frequency := map[rune]int{}
 	for _, r := range text {
@@ -68,6 +68,10 @@ func EncodeHuffmanTree(w io.Writer, huffman *PriorityQueueNode[HuffmanNode, int]
 		return nil
 	}
 
+	if err := writeNode(w, huffman); err != nil {
+		return err
+	}
+
 	if err := EncodeHuffmanTree(w, huffman.Data.Left); err != nil {
 		return err
 	}
@@ -76,11 +80,85 @@ func EncodeHuffmanTree(w io.Writer, huffman *PriorityQueueNode[HuffmanNode, int]
 		return err
 	}
 
-	return writeNode(w, huffman)
+	return nil
 }
 
-func DecodeHuffmanTree(r bufio.Reader) *PriorityQueueNode[HuffmanNode, int] {
-	return nil
+type Scanner interface {
+	io.ByteScanner
+	io.RuneScanner
+}
+
+func DecodeHuffmanTree(scanner Scanner) (*PriorityQueueNode[HuffmanNode, int], int, error) {
+	s := []*PriorityQueueNode[HuffmanNode, int]{}
+
+	// Header
+	for {
+		b, err := scanner.ReadByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, 0, err
+		}
+
+		// End of tree
+		if b == 0 {
+			break
+		}
+
+		// Internal Node
+		if b == 1 {
+			s = append(s, &PriorityQueueNode[HuffmanNode, int]{})
+			continue
+		}
+
+		if err := scanner.UnreadByte(); err != nil {
+			return nil, 0, err
+		}
+
+		// Leaf Node
+		r, _, err := scanner.ReadRune()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, 0, err
+		}
+
+		s = append(s, &PriorityQueueNode[HuffmanNode, int]{
+			Data: HuffmanNode{
+				Rune: r,
+			},
+		})
+	}
+
+	textLength, err := binary.ReadUvarint(scanner)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	stack := &Stack[*PriorityQueueNode[HuffmanNode, int]]{
+		Data: []*PriorityQueueNode[HuffmanNode, int]{},
+	}
+
+	for i := len(s) - 1; i >= 0; i-- {
+		stack.Push(s[i])
+	}
+
+	return buildHuffmanTreeFromStack(stack), int(textLength), nil
+}
+
+func buildHuffmanTreeFromStack(stack *Stack[*PriorityQueueNode[HuffmanNode, int]]) *PriorityQueueNode[HuffmanNode, int] {
+	if stack.Len() < 1 {
+		return nil
+	}
+	node := stack.Pop()
+	if node.Data.Rune != 0 {
+		return node
+	}
+	node.Data.Left = buildHuffmanTreeFromStack(stack)
+	node.Data.Right = buildHuffmanTreeFromStack(stack)
+	return node
 }
 
 func BuildHuffmanDictionary(huffman *PriorityQueueNode[HuffmanNode, int]) map[rune]uint32 {

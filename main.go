@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	text, err := os.ReadFile("lorem.txt")
+	text, err := os.ReadFile("enwik9")
 	if err != nil {
 		panic(err)
 	}
@@ -24,10 +24,9 @@ func main() {
 }
 
 func compress(text string) {
-	huffman := BuildHuffmanTree(text)
+	huffman := BuildHuffmanTreeFromText(text)
 	dictionary := BuildHuffmanDictionary(&huffman)
 
-	fmt.Println(Render(&huffman))
 	file, err := os.Create("text.maikati")
 	if err != nil {
 		panic(err)
@@ -78,86 +77,10 @@ func decompress() {
 
 	br := bufio.NewReader(file)
 
-	s := []*PriorityQueueNode[HuffmanNode, int]{}
-
-	// Header
-	for {
-		b, err := br.ReadByte()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			panic(err)
-		}
-
-		fmt.Printf("%08b ", b)
-
-		if b == 0 {
-			break
-		}
-
-		if b == 1 {
-			s = append(s, &PriorityQueueNode[HuffmanNode, int]{})
-			continue
-		}
-
-		if err := br.UnreadByte(); err != nil {
-			panic(err)
-		}
-
-		// Leaf Node
-		r, _, err := br.ReadRune()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			panic(err)
-		}
-
-		s = append(s, &PriorityQueueNode[HuffmanNode, int]{
-			Data: HuffmanNode{
-				Rune: r,
-			},
-		})
-	}
-	fmt.Println()
-
-	stack := Stack[*PriorityQueueNode[HuffmanNode, int]]{
-		Data: []*PriorityQueueNode[HuffmanNode, int]{
-			s[len(s)-1],
-		},
-	}
-
-	for i := len(s) - 2; i >= 0; i-- {
-		n := &PriorityQueueNode[HuffmanNode, int]{
-			Data: HuffmanNode{
-				Left:  left,
-				Right: right,
-			},
-		}
-		fmt.Println("size", stack.Len())
-		if stack.Len() > 2 {
-			right := stack.Pop()
-			left := stack.Pop()
-			stack.Push()
-		} else {
-			stack.Push(&PriorityQueueNode[HuffmanNode, int]{
-				Data: HuffmanNode{
-					Rune: s[i].Data.Rune,
-				},
-			})
-		}
-	}
-	fmt.Printf("%+v\n", stack)
-
-	textLength, err := binary.ReadUvarint(br)
+	root, textLength, err := DecodeHuffmanTree(br)
 	if err != nil {
 		panic(err)
 	}
-
-	// Body
-	root := stack.Pop()
-	fmt.Println(Render(root))
 
 	// todo: flush / buffer to handle larger files
 	sb := &strings.Builder{}
@@ -189,7 +112,7 @@ func decompress() {
 			break
 		}
 	}
-	fmt.Println(sb.String())
+	fmt.Print(sb.String())
 }
 
 // shoutout tsetso
