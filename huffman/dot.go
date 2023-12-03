@@ -1,13 +1,14 @@
-package main
+package huffman
 
 import (
 	"fmt"
 	"math/rand"
 
 	"github.com/emicklei/dot"
+	"github.com/fr3fou/depressor/pq"
 )
 
-func Render(huffman *PriorityQueueNode[HuffmanNode, int]) string {
+func Render(huffman *pq.Node[Node, int]) string {
 	graph := dot.NewGraph(dot.Directed)
 	// This preserves the order in which they were added
 	// Otherwise, left & right _could_ be swapped
@@ -19,7 +20,7 @@ func Render(huffman *PriorityQueueNode[HuffmanNode, int]) string {
 	return graph.String()
 }
 
-func render(huffman *PriorityQueueNode[HuffmanNode, int], graph *dot.Graph, node dot.Node) {
+func render(huffman *pq.Node[Node, int], graph *dot.Graph, node dot.Node) {
 	if huffman.Data.Left != nil {
 		r := huffman.Data.Left.Data.Rune
 		leftNode := graph.Node(randomID(5))

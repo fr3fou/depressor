@@ -1,4 +1,4 @@
-module github.com/fr3fou/compression
+module github.com/fr3fou/depressor
 
 go 1.21.3
 

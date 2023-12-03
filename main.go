@@ -9,6 +9,8 @@ import (
 	"math/bits"
 	"os"
 	"strings"
+
+	"github.com/fr3fou/depressor/huffman"
 )
 
 func main() {
@@ -24,8 +26,8 @@ func main() {
 }
 
 func compress(text string) {
-	huffman := BuildHuffmanTreeFromText(text)
-	dictionary := BuildHuffmanDictionary(&huffman)
+	tree := huffman.BuildTreeFromText(text)
+	dictionary := huffman.BuildHuffmanDictionary(&tree)
 
 	file, err := os.Create("text.maikati")
 	if err != nil {
@@ -36,7 +38,7 @@ func compress(text string) {
 	writer := bufio.NewWriter(file)
 
 	// Header
-	if err := EncodeHuffmanTree(writer, &huffman); err != nil {
+	if err := huffman.Encode(writer, &tree); err != nil {
 		panic(err)
 	}
 
@@ -77,7 +79,12 @@ func decompress() {
 
 	br := bufio.NewReader(file)
 
-	root, textLength, err := DecodeHuffmanTree(br)
+	root, err := huffman.Decode(br)
+	if err != nil {
+		panic(err)
+	}
+
+	textLength, err := binary.ReadUvarint(br)
 	if err != nil {
 		panic(err)
 	}

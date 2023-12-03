@@ -1,4 +1,4 @@
-package main
+package stack
 
 type Stack[T any] struct {
 	Data []T
