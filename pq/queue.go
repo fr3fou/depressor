@@ -71,8 +71,11 @@ func (pq *Queue[T, U]) Pop() (n Node[T, U], ok bool) {
 	return top, true
 }
 
-func (pq *Queue[T, U]) Push(item Node[T, U]) {
-	pq.Heap = append(pq.Heap, item)
+func (pq *Queue[T, U]) Push(item T, value U) {
+	pq.Heap = append(pq.Heap, Node[T, U]{
+		Data:  item,
+		Value: value,
+	})
 	i := len(pq.Heap) - 1
 	for i > 0 {
 		parent := (i - 1) / 2

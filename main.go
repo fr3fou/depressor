@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math/bits"
 	"os"
 	"strings"
@@ -14,46 +15,75 @@ import (
 )
 
 func main() {
-	text, err := os.ReadFile("enwik9")
-	if err != nil {
-		panic(err)
-	}
-	if len(os.Args) > 1 && os.Args[1] == "decompress" {
-		decompress()
-	} else {
-		compress(string(text))
+	if err := run(); err != nil {
+		log.Fatalln(err)
 	}
 }
 
-func compress(text string) {
-	tree := huffman.BuildTreeFromText(text)
-	dictionary := huffman.BuildHuffmanDictionary(&tree)
+func usage() {
+	log.Println("usage: ")
+	log.Println("	depressor -c file.txt")
+	log.Println("	depressor -d file.txt.mkti")
+	log.Println("	depressor -help")
+}
 
-	file, err := os.Create("text.maikati")
-	if err != nil {
-		panic(err)
+func run() error {
+	if len(os.Args) < 3 {
+		usage()
+		return nil
 	}
-	defer file.Close()
 
-	writer := bufio.NewWriter(file)
+	cmd := os.Args[1]
+	fileName := os.Args[2]
+	input, err := os.Open(fileName)
+	if err != nil {
+		return fmt.Errorf("failed opening file for reading: %w", err)
+	}
+	defer input.Close()
 
-	// Header
-	if err := huffman.Encode(writer, &tree); err != nil {
-		panic(err)
+	if cmd == "-c" {
+		return compress(fileName, input)
+	}
+
+	if cmd == "-d" {
+		return decompress(fileName, input)
+	}
+
+	usage()
+	return nil
+}
+
+func compress(fileName string, reader io.Reader) error {
+	sb := &strings.Builder{}
+	io.Copy(sb, reader)
+
+	text := sb.String()
+	tree := huffman.BuildTree(text)
+	dictionary := huffman.BuildDictionary(tree)
+
+	output, err := os.Create(fmt.Sprintf("%s.mkti", fileName))
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+
+	writer := bufio.NewWriter(output)
+
+	if err := huffman.EncodeTree(writer, &tree); err != nil {
+		return nil
 	}
 
 	if err := binary.Write(writer, binary.BigEndian, byte(0)); err != nil {
-		panic(err)
+		return nil
 	}
 
 	buf := []byte{}
 	buf = binary.AppendUvarint(buf, uint64(len(text)))
 	_, err = writer.Write(buf)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	// Body
 	var overflow int8
 	buf = []byte{}
 	for _, r := range text {
@@ -63,48 +93,47 @@ func compress(text string) {
 
 	_, err = writer.Write(buf)
 	if err != nil {
-		panic(err)
+		return nil
 	}
 
 	if err := writer.Flush(); err != nil {
-		panic(err)
+		return nil
 	}
+	return nil
 }
 
-func decompress() {
-	file, err := os.Open("text.maikati")
-	if err != nil {
-		panic(err)
-	}
-
-	br := bufio.NewReader(file)
-
+func decompress(fileName string, reader io.Reader) error {
+	br := bufio.NewReader(reader)
 	root, err := huffman.Decode(br)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	textLength, err := binary.ReadUvarint(br)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	// todo: flush / buffer to handle larger files
+	output, err := os.Create(strings.ReplaceAll(fileName, ".mkti", ""))
+	if err != nil {
+		return fmt.Errorf("failed opening file for writing: %w", err)
+	}
+	defer output.Close()
+
 	sb := &strings.Builder{}
 	node := root
 	for sb.Len() < int(textLength) {
 		b, err := br.ReadByte()
 		if err != nil && !errors.Is(err, io.EOF) {
-			fmt.Println(err)
-			break
+			return err
 		}
 
 		p := 7
 		for p >= 0 && sb.Len() < int(textLength) {
 			if (b & (1 << p)) == 0 {
-				node = node.Data.Left
+				node = *node.Data.Left
 			} else {
-				node = node.Data.Right
+				node = *node.Data.Right
 			}
 
 			if node.Data.Rune != 0 {
@@ -115,11 +144,12 @@ func decompress() {
 		}
 
 		if err != nil {
-			// end of file
 			break
 		}
 	}
-	fmt.Print(sb.String())
+
+	_, err = output.WriteString(sb.String())
+	return err
 }
 
 // shoutout tsetso

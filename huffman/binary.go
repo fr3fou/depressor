@@ -11,7 +11,7 @@ import (
 	"github.com/fr3fou/depressor/stack"
 )
 
-func Encode(w io.Writer, huffman *pq.Node[Node, int]) error {
+func EncodeTree(w io.Writer, huffman *pq.Node[Node, int]) error {
 	if huffman == nil {
 		return nil
 	}
@@ -20,11 +20,11 @@ func Encode(w io.Writer, huffman *pq.Node[Node, int]) error {
 		return err
 	}
 
-	if err := Encode(w, huffman.Data.Left); err != nil {
+	if err := EncodeTree(w, huffman.Data.Left); err != nil {
 		return err
 	}
 
-	if err := Encode(w, huffman.Data.Right); err != nil {
+	if err := EncodeTree(w, huffman.Data.Right); err != nil {
 		return err
 	}
 
@@ -52,7 +52,7 @@ type Scanner interface {
 	io.RuneScanner
 }
 
-func Decode(scanner Scanner) (*pq.Node[Node, int], error) {
+func Decode(scanner Scanner) (pq.Node[Node, int], error) {
 	s := []*pq.Node[Node, int]{}
 
 	for {
@@ -61,7 +61,7 @@ func Decode(scanner Scanner) (*pq.Node[Node, int], error) {
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			return nil, err
+			return pq.Node[Node, int]{}, err
 		}
 
 		// End of tree
@@ -76,7 +76,7 @@ func Decode(scanner Scanner) (*pq.Node[Node, int], error) {
 		}
 
 		if err := scanner.UnreadByte(); err != nil {
-			return nil, err
+			return pq.Node[Node, int]{}, err
 		}
 
 		// Leaf node
@@ -85,7 +85,7 @@ func Decode(scanner Scanner) (*pq.Node[Node, int], error) {
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			return nil, err
+			return pq.Node[Node, int]{}, err
 		}
 
 		s = append(s, &pq.Node[Node, int]{
@@ -97,7 +97,7 @@ func Decode(scanner Scanner) (*pq.Node[Node, int], error) {
 
 	slices.Reverse(s)
 	stack := stack.Stack[*pq.Node[Node, int]]{Data: s}
-	return rebuildTree(&stack), nil
+	return *rebuildTree(&stack), nil
 }
 
 func rebuildTree(stack *stack.Stack[*pq.Node[Node, int]]) *pq.Node[Node, int] {

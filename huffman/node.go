@@ -10,7 +10,7 @@ type Node struct {
 	Rune  rune
 }
 
-func BuildTreeFromText(text string) pq.Node[Node, int] {
+func BuildTree(text string) pq.Node[Node, int] {
 	queue := pq.NewPriorityQueue[Node, int]()
 	frequency := map[rune]int{}
 	for _, r := range text {
@@ -18,12 +18,10 @@ func BuildTreeFromText(text string) pq.Node[Node, int] {
 	}
 
 	for k, v := range frequency {
-		queue.Push(pq.Node[Node, int]{
-			Data: Node{
-				Rune: k,
-			},
-			Value: v,
-		})
+		node := Node{
+			Rune: k,
+		}
+		queue.Push(node, v)
 	}
 
 	for !queue.Empty() {
@@ -32,25 +30,23 @@ func BuildTreeFromText(text string) pq.Node[Node, int] {
 		if !leftOk || !rightOk {
 			return left
 		}
-		queue.Push(pq.Node[Node, int]{
-			Data: Node{
-				Left:  &left,
-				Right: &right,
-			},
-			Value: left.Value + right.Value,
-		})
+		node := Node{
+			Left:  &left,
+			Right: &right,
+		}
+		queue.Push(node, left.Value+right.Value)
 	}
 
 	return pq.Node[Node, int]{}
 }
 
-func BuildHuffmanDictionary(node *pq.Node[Node, int]) map[rune]uint32 {
+func BuildDictionary(node pq.Node[Node, int]) map[rune]uint32 {
 	dictionary := map[rune]uint32{}
 	buildHuffmanDictionary(node, dictionary, 0, 0)
 	return dictionary
 }
 
-func buildHuffmanDictionary(node *pq.Node[Node, int], dictionary map[rune]uint32, depth uint32, state uint32) {
+func buildHuffmanDictionary(node pq.Node[Node, int], dictionary map[rune]uint32, depth uint32, state uint32) {
 	if node.Data.Rune != 0 {
 		dictionary[node.Data.Rune] = state | (1 << depth) // Mark end of state/prefix code, will be removed before serializing
 		return
@@ -58,11 +54,11 @@ func buildHuffmanDictionary(node *pq.Node[Node, int], dictionary map[rune]uint32
 
 	if node.Data.Left != nil {
 		// Set 0 for left
-		buildHuffmanDictionary(node.Data.Left, dictionary, depth+1, state)
+		buildHuffmanDictionary(*node.Data.Left, dictionary, depth+1, state)
 	}
 
 	if node.Data.Right != nil {
 		// Set 1 for right
-		buildHuffmanDictionary(node.Data.Right, dictionary, depth+1, state|(1<<depth))
+		buildHuffmanDictionary(*node.Data.Right, dictionary, depth+1, state|(1<<depth))
 	}
 }
