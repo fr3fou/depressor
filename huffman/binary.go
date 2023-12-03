@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"slices"
 	"unicode/utf8"
 
 	"github.com/fr3fou/depressor/pq"
@@ -68,7 +69,7 @@ func Decode(scanner Scanner) (*pq.Node[Node, int], error) {
 			break
 		}
 
-		// Internal Node
+		// Internal node
 		if b == 1 {
 			s = append(s, &pq.Node[Node, int]{})
 			continue
@@ -78,7 +79,7 @@ func Decode(scanner Scanner) (*pq.Node[Node, int], error) {
 			return nil, err
 		}
 
-		// Leaf Node
+		// Leaf node
 		r, _, err := scanner.ReadRune()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
@@ -94,12 +95,8 @@ func Decode(scanner Scanner) (*pq.Node[Node, int], error) {
 		})
 	}
 
-	stack := stack.NewStack[*pq.Node[Node, int]]()
-
-	for i := len(s) - 1; i >= 0; i-- {
-		stack.Push(s[i])
-	}
-
+	slices.Reverse(s)
+	stack := stack.Stack[*pq.Node[Node, int]]{Data: s}
 	return rebuildTree(&stack), nil
 }
 

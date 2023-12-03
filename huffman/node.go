@@ -44,25 +44,25 @@ func BuildTreeFromText(text string) pq.Node[Node, int] {
 	return pq.Node[Node, int]{}
 }
 
-func BuildHuffmanDictionary(huffman *pq.Node[Node, int]) map[rune]uint32 {
+func BuildHuffmanDictionary(node *pq.Node[Node, int]) map[rune]uint32 {
 	dictionary := map[rune]uint32{}
-	buildHuffmanDictionary(huffman, dictionary, 0, 0)
+	buildHuffmanDictionary(node, dictionary, 0, 0)
 	return dictionary
 }
 
-func buildHuffmanDictionary(huffman *pq.Node[Node, int], dictionary map[rune]uint32, depth uint32, state uint32) {
-	if huffman.Data.Rune != 0 {
-		dictionary[huffman.Data.Rune] = state | (1 << depth) // Mark end of state/prefix code, will be removed before serializing
+func buildHuffmanDictionary(node *pq.Node[Node, int], dictionary map[rune]uint32, depth uint32, state uint32) {
+	if node.Data.Rune != 0 {
+		dictionary[node.Data.Rune] = state | (1 << depth) // Mark end of state/prefix code, will be removed before serializing
 		return
 	}
 
-	if huffman.Data.Left != nil {
+	if node.Data.Left != nil {
 		// Set 0 for left
-		buildHuffmanDictionary(huffman.Data.Left, dictionary, depth+1, state)
+		buildHuffmanDictionary(node.Data.Left, dictionary, depth+1, state)
 	}
 
-	if huffman.Data.Right != nil {
+	if node.Data.Right != nil {
 		// Set 1 for right
-		buildHuffmanDictionary(huffman.Data.Right, dictionary, depth+1, state|(1<<depth))
+		buildHuffmanDictionary(node.Data.Right, dictionary, depth+1, state|(1<<depth))
 	}
 }
